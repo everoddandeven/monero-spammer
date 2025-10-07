@@ -10,7 +10,7 @@ class Utils(ABC):
         if network_type == MoneroNetworkType.MAINNET:
             return ""
         elif network_type == MoneroNetworkType.TESTNET:
-            return ""
+            return "9y1Ye5ZdZQzauBunKyHE3BcheyBFZDAWrheJtDe6UN3HUbPfxcaiHsESXJWyzXFFB3X8gimB9cTx6R3woC4EmCCg2cVhgqK"
         elif network_type == MoneroNetworkType.STAGENET:
             return ""
         
@@ -24,6 +24,15 @@ class Utils(ABC):
         assert tx.outgoing_transfer.amount is not None
         return tx.outgoing_transfer.amount
 
+    @classmethod
+    def get_tx_received_amount(cls, tx: MoneroTxWallet) -> int:
+        amount: int = 0
+
+        for transfer in tx.incoming_transfers:
+            assert transfer.amount is not None
+            amount += transfer.amount
+
+        return amount
 
     @classmethod
     def get_uuid(cls, length: int = 25) -> str:

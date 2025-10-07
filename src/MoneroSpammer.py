@@ -5,12 +5,12 @@ from monero import (
     MoneroAccount, MoneroTxConfig, MoneroDestination, MoneroTxWallet, MoneroError, MoneroUtils,
     MoneroSubaddress
 )
-from .utils import MoneroWalletLoader, MoneroWalletTracker, Utils, NotEnoughBalanceException, WaitingForUnlockedFundsException
+from .utils import MoneroWalletLoader, MoneroWalletTracker, NotEnoughBalanceException, WaitingForUnlockedFundsException
 
 
 class MoneroSpammer:
 
-    AMOUNT: int = MoneroUtils.xmr_to_atomic_units(0.01)
+    AMOUNT: int = 750000
     SEND_DIVISOR: int = 10
     SYNC_PERIOD_MS: int = 10000
 
@@ -33,7 +33,7 @@ class MoneroSpammer:
     def __del__(self) -> None:
         self.dispose()
 
-    def _send_to_multiple(self, wallet: MoneroWallet, num_accounts: int = 3, num_subaddresses_per_account: int = 15, can_split: bool = True, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
+    def _send_to_multiple(self, wallet: MoneroWallet, num_accounts: int = 1, num_subaddresses_per_account: int = 2, can_split: bool = True, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
         daemon = self.get_daemon()
 
         self._tracker.wait_for_unlocked_balance(daemon, self.SYNC_PERIOD_MS, wallet, 0)
@@ -87,7 +87,8 @@ class MoneroSpammer:
         i: int = 0
 
         while i < (num_accounts - len(accounts)):
-            wallet.create_account()
+            account = wallet.create_account()
+            print(f"[*] Created account {account.index} for wallet {wallet.get_path()}")
             i += 1
 
         # create minimum number of subaddresses per account and collect destination addresses
@@ -96,8 +97,10 @@ class MoneroSpammer:
         for i in range(num_accounts):
             subaddresses = wallet.get_subaddresses(i)
             
-            for i in range(num_subaddresses_per_account - len(subaddresses)):
+            for j in range(num_subaddresses_per_account - len(subaddresses)):
+                print(f"[*] Creating subaddress {j} for account {i}...")
                 wallet.create_subaddress(i)
+                print(f"[*] Created subaddress {j} for account {i}")
             
             subaddresses = wallet.get_subaddresses(i)
 
@@ -136,7 +139,9 @@ class MoneroSpammer:
         txs: list[MoneroTxWallet] = []
 
         try:
+            print("[*] Creating txs...")
             txs = wallet.create_txs(config)
+            print(f"[*] Created {len(txs)}")
         except MoneroError as e:
             # test error applying subtract_from_fee with split txs
             if (subtract_fee_from_destinations and len(txs) == 0):
@@ -259,33 +264,41 @@ class MoneroSpammer:
         
         return txs
 
-    def start(self) -> None:
-        wallets: list[MoneroWallet] = []
-        try:
-            wallets = self.get_wallets()
+    def send_to_multiple(self) -> None:
+        print("[*] Sending to multiple subaddresses...")
+        wallets = self.get_wallets()
+        total_txs: int = 0
 
-            for wallet in wallets:
-                path = wallet.get_path()
-                self._result[path] = self._send_to_multiple(wallet)
-                
-                sleep(10)
+        for wallet in wallets:
+            try:
+                txs = self._send_to_multiple(wallet)
+                total_txs = len(txs)
+                print(f"[*] Spammed {len(txs)} txs from wallet at {wallet.get_path()}")
+                sleep(2)
                 wallet.save()
-            
-            daemon = self.get_daemon()
+            except Exception as e:
+                print(f"[!] Could not send txs from {wallet.get_path()}: {e}")
+                input(f"[>] Press Enter to continue: ")
 
-            while True:
-                self._tracker.wait_for_unlocked_balances(daemon, self.SYNC_PERIOD_MS, wallets, 0)
+        print(f"[*] Spammed a total of {total_txs} txs")
 
-                for wallet in wallets:
-                    txs: list[MoneroTxWallet] = self._send_to_multiple(wallet)
+    def send_from_multiple(self) -> None:
+        print("[*] Sending from multiple subaddresses...")
+        wallets = self.get_wallets()
+        total_txs: int = 0
 
-                    for tx in txs:
-                        print(f"Spammed tx {tx.hash}, amount: {MoneroUtils.atomic_units_to_xmr(Utils.get_tx_sent_amount(tx))}")
+        for wallet in wallets:
+            try:
+                txs = self._send_from_multiple(wallet)
+                total_txs = len(txs)
+                print(f"[*] Spammed {len(txs)} txs from wallet at {wallet.get_path()}")
+                sleep(2)
+                wallet.save()
+            except Exception as e:
+                print(f"[!] Could not send txs from {wallet.get_path()}: {e}")
+                input(f"[>] Press Enter to continue: ")
 
-                sleep(10)
-
-        except Exception as e:
-            print(f"[!] An error occurred: {e}")
+        print(f"[*] Spammed a total of {total_txs} txs")
     
     def get_result(self) -> dict[str, list[MoneroTxWallet]]:
         return self._result
