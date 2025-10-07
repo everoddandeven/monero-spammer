@@ -2,7 +2,8 @@ from typing import Optional
 from time import sleep
 from monero import (
     MoneroDaemon, MoneroDaemonRpc, MoneroWallet, MoneroRpcConnection, MoneroTxPriority,
-    MoneroAccount, MoneroTxConfig, MoneroDestination, MoneroTxWallet, MoneroError, MoneroUtils
+    MoneroAccount, MoneroTxConfig, MoneroDestination, MoneroTxWallet, MoneroError, MoneroUtils,
+    MoneroSubaddress
 )
 from .utils import MoneroWalletLoader, MoneroWalletTracker, Utils, NotEnoughBalanceException, WaitingForUnlockedFundsException
 
@@ -32,7 +33,7 @@ class MoneroSpammer:
     def __del__(self) -> None:
         self.dispose()
 
-    def _create_txs(self, wallet: MoneroWallet, num_accounts: int, num_subaddresses_per_account: int, can_split: bool, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
+    def _send_to_multiple(self, wallet: MoneroWallet, num_accounts: int = 3, num_subaddresses_per_account: int = 15, can_split: bool = True, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
         daemon = self.get_daemon()
 
         self._tracker.wait_for_unlocked_balance(daemon, self.SYNC_PERIOD_MS, wallet, 0)
@@ -166,8 +167,97 @@ class MoneroSpammer:
         
         return txs
 
-    def _send_to_multiple(self, wallet: MoneroWallet) -> list[MoneroTxWallet]:
-        return self._create_txs(wallet, 3, 15, True)
+    def _send_from_multiple(self, wallet: MoneroWallet, can_split: bool = True) -> list[MoneroTxWallet]:
+        daemon = self.get_daemon()
+        self._tracker.wait_for_wallet_txs_to_clear_pool(daemon, self.SYNC_PERIOD_MS, [wallet])
+        config = MoneroTxConfig()
+        config.can_split = can_split
+
+        # number of subaddresses to send from
+        num_subaddresses: int = 2
+
+        # get first account with (NUM_SUBADDRESSES + 1) subaddresses with unlocked balances
+        accounts = wallet.get_accounts(True)
+        assert len(accounts) > 2, "This test requires at least 2 accounts; run send-to-multiple test"
+        src_account: Optional[MoneroAccount] = None
+        unlocked_subaddresses: list[MoneroSubaddress] = []
+        has_balance: bool = False
+
+        for account in accounts:
+            unlocked_subaddresses.clear()
+            num_subaddress_balances: int = 0
+
+            for subaddress in account.subaddresses:
+                assert subaddress.balance is not None
+                assert subaddress.unlocked_balance is not None
+                if subaddress.balance > self.AMOUNT:
+                    num_subaddress_balances += 1
+                if subaddress.unlocked_balance > self.AMOUNT:
+                    unlocked_subaddresses.append(subaddress)
+            
+            if num_subaddress_balances >= num_subaddresses + 1:
+                has_balance = True
+            
+            if len(unlocked_subaddresses) >= num_subaddresses + 1:
+                src_account = account
+                break
+
+        
+        assert has_balance, f"Wallet does not have account with {num_subaddresses + 1} subaddresses with balances; run send-to-multiple tests"
+        assert len(unlocked_subaddresses) >= num_subaddresses + 1, f"Wallet {wallet.get_path()} is waiting on unlocked funds"
+        assert src_account is not None
+        assert src_account.index is not None
+
+        # determine the indices of the first two subaddresses with unlocked balances
+
+        from_subaddress_indices: list[int] = []
+
+        for i in range(num_subaddresses):
+            index = unlocked_subaddresses[i].index
+            assert index is not None
+            from_subaddress_indices.append(index)
+
+        # determine the amount to send
+
+        send_amount: int = 0
+
+        for from_subaddress_index in from_subaddress_indices:
+            amount = src_account.subaddresses[from_subaddress_index].unlocked_balance
+            assert amount is not None
+            send_amount += amount
+
+        send_amount = int(send_amount / self.SEND_DIVISOR)
+
+        from_balance: int = 0
+        from_unlocked_balance: int = 0
+
+        for subaddress_index in from_subaddress_indices:
+            subaddress: MoneroSubaddress = wallet.get_subaddress(src_account.index, subaddress_index)
+            assert subaddress.balance is not None
+            assert subaddress.unlocked_balance is not None
+            from_balance += subaddress.balance
+            from_unlocked_balance += subaddress.unlocked_balance
+
+        # send from the first subaddresses with unlocked balances
+
+        address: str = wallet.get_primary_address()
+        destinations: list[MoneroDestination] = [MoneroDestination(address, send_amount)]
+        config = MoneroTxConfig()
+        config.destinations = destinations
+        config.account_index = src_account.index
+        config.subaddress_indices = from_subaddress_indices
+        config.relay = True
+        txs: list[MoneroTxWallet] = []
+
+        if config.can_split is not False:
+            txs.extend(wallet.create_txs(config))
+        else:
+            txs.append(wallet.create_tx(config))
+        
+        if config.can_split is False:
+            assert len(txs) == 1, "Must have exactly one tx if no split"
+        
+        return txs
 
     def start(self) -> None:
         wallets: list[MoneroWallet] = []
