@@ -139,7 +139,7 @@ class MoneroSpammer:
         txs: list[MoneroTxWallet] = []
 
         try:
-            print(f"[*] Sending {send_amount} from account {config.account_index} to {len(config.destinations)} subaddresses")
+            print(f"[*] Sending a total {MoneroUtils.atomic_units_to_xmr(send_amount):.12f} XMR ({(MoneroUtils.atomic_units_to_xmr(send_amount_per_subaddress)):.12f} XMR per subaddress) from account {config.account_index} to {len(config.destinations)} subaddresses")
             txs = wallet.create_txs(config)
             print(f"[*] Created {len(txs)} tx(s):")
             for tx in txs:
