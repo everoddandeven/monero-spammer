@@ -1,6 +1,6 @@
 import os
 from time import sleep
-from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils, MoneroOutgoingTransfer, MoneroIncomingTransfer
+from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils, MoneroOutgoingTransfer, MoneroIncomingTransfer, MoneroOutputWallet, MoneroOutputQuery
 from src import MoneroSpammer, Utils
 
 class StringUtils:
@@ -8,6 +8,30 @@ class StringUtils:
     @classmethod
     def is_null_or_empty(cls, string: str | None) -> bool:
         return string is None or string == ''
+
+    @classmethod
+    def print_output(cls, output: MoneroOutputWallet | None, skip_spent: bool = True) -> None:
+        if output is None or (skip_spent and output.is_spent):
+            return
+        
+        assert output.amount is not None
+
+        print(f"\t[*] Output: {MoneroUtils.atomic_units_to_xmr(output.amount):.12f} XMR, Subaddress index: {output.account_index},{output.subaddress_index}, Key: {output.stealth_public_key}, spent: {output.is_spent}")
+
+    @classmethod
+    def print_outputs(cls, outputs: list[MoneroOutputWallet]) -> None:
+        for output in outputs:
+            cls.print_output(output)
+
+    @classmethod
+    def print_wallet_outputs(cls, wallets: list[MoneroWallet]) -> None:
+        query = MoneroOutputQuery()
+        index: int = 1
+        for wallet in wallets:
+            print(f"[*] spam_wallet_{index} unspent outputs:")
+            outputs = wallet.get_outputs(query)
+            cls.print_outputs(outputs)
+            index += 1
     
     @classmethod
     def print_outgoing_transfer(cls, transfer: MoneroOutgoingTransfer | None) -> None:
@@ -197,10 +221,11 @@ class InputHandler:
 [2] Send from multiple subaddresses
 [3] Show transactions
 [4] Show addresses
-[5] Show wallet balances
-[6] Show wallet seeds
-[7] Set log level
-[8] Quit
+[5] Show unspent outputs
+[6] Show wallet balances
+[7] Show wallet seeds
+[8] Set log level
+[9] Quit
 
 [>] Insert command: """
 
@@ -210,13 +235,13 @@ class InputHandler:
             try:
                 cmd = int(input(msg))
 
-                if cmd < 1 or cmd > 8:
-                    raise Exception("")
+                if cmd < 1 or cmd > 9:
+                    raise Exception(f"{cmd}")
                 
                 return cmd
             
-            except:
-                print("[!] Invalid command provided")
+            except Exception as e:
+                print(f"[!] Invalid command provided: {e}")
                 sleep(3)
                 continue
 
@@ -273,17 +298,20 @@ def main():
                 StringUtils.print_subaddresses(wallets)
                 input("[>] Press Enter to continue: ")
             elif command == 5:
-                StringUtils.print_wallet_balances(wallets)
+                StringUtils.print_wallet_outputs(wallets)
                 input("[>] Press Enter to continue: ")
             elif command == 6:
-                StringUtils.print_wallet_seeds(wallets)
+                StringUtils.print_wallet_balances(wallets)
                 input("[>] Press Enter to continue: ")
             elif command == 7:
+                StringUtils.print_wallet_seeds(wallets)
+                input("[>] Press Enter to continue: ")
+            elif command == 8:
                 level = InputHandler.get_log_level()
                 MoneroUtils.set_log_level(level)
                 print(f"[*] Monero log level set to {level}")
                 input("[>] Press Enter to continue: ")
-            elif command == 8:
+            elif command == 9:
                 print("[*] Quit")
                 return
             else:
