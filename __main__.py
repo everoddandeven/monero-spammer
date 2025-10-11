@@ -1,6 +1,6 @@
 import os
 from time import sleep
-from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils
+from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils, MoneroOutgoingTransfer
 from src import MoneroSpammer, Utils
 
 class StringUtils:
@@ -9,6 +9,14 @@ class StringUtils:
     def is_null_or_empty(cls, string: str | None) -> bool:
         return string is None or string == ''
     
+    @classmethod
+    def print_outgoing_transfer(cls, transfer: MoneroOutgoingTransfer | None) -> None:
+        if transfer is None:
+            return
+        
+        for dest in transfer.destinations:
+            print(f"\t\t[*] From account: {transfer.account_index}, Destination: {dest.address}, Amount: {str(dest.amount)}")
+
     @classmethod
     def print_txs(cls, wallet: MoneroWallet | list[MoneroWallet]) -> None:
         wallets: list[MoneroWallet] = [wallet] if isinstance(wallet, MoneroWallet) else wallet
@@ -21,6 +29,7 @@ class StringUtils:
                 sent = MoneroUtils.atomic_units_to_xmr(Utils.get_tx_sent_amount(tx))
                 received = MoneroUtils.atomic_units_to_xmr(Utils.get_tx_received_amount(tx))
                 print(f"\t[*] hash {tx.hash}, sent: {sent} XMR, received: {received} XMR, confirmations: {tx.num_confirmations}")
+                cls.print_outgoing_transfer(tx.outgoing_transfer)
 
     @classmethod
     def print_primary_addresses(cls, wallets: list[MoneroWallet]) -> None:
@@ -31,11 +40,27 @@ class StringUtils:
             i += 1
 
     @classmethod
+    def print_wallet_subaddresses(cls, wallet: MoneroWallet, index: int) -> None:
+        print(f"[*] spam_wallet_{index} subaddresses")
+        accounts = wallet.get_accounts(True)
+
+        for account in accounts:
+            for subaddress in account.subaddresses:
+                print(f"\t[*] Account: {subaddress.account_index}, Index: {subaddress.index}, Balance {subaddress.balance}, Address: {subaddress.address}")
+
+    @classmethod
+    def print_subaddresses(cls, wallets: list[MoneroWallet]) -> None:
+        i: int = 1
+        for wallet in wallets:
+            cls.print_wallet_subaddresses(wallet, i)
+            i += 1
+
+    @classmethod
     def print_wallet_balances(cls, wallets: list[MoneroWallet]) -> None:
         i: int = 1
         for wallet in wallets:
             balance = wallet.get_balance()
-            print(f"[*] spam_wallet_{i} balance: {MoneroUtils.atomic_units_to_xmr(balance)} XMR")
+            print(f"[*] spam_wallet_{i} balance: {str(MoneroUtils.atomic_units_to_xmr(balance))} XMR")
             i += 1
 
     @classmethod
@@ -117,12 +142,46 @@ class InputHandler:
                 continue
 
     @classmethod
+    def get_num_accounts_to_use(cls) -> int:
+        while True:
+            num_str = input("[>] Insert number of accounts to send to: ")
+
+            try:
+                num = int(num_str)
+
+                if num < 1:
+                    raise Exception("Invalid input")
+                
+                return num
+            
+            except:
+                print(f"[!] Invalid input. Please insert an integer > 1.")
+                continue
+
+    @classmethod
+    def get_num_subaddresses_to_use(cls) -> int:
+        while True:
+            num_str = input("[>] Insert number of subaddresses to send to for each account: ")
+
+            try:
+                num = int(num_str)
+
+                if num < 1:
+                    raise Exception("Invalid input")
+                
+                return num
+            
+            except:
+                print(f"[!] Invalid input. Please insert an integer > 1.")
+                continue
+
+    @classmethod
     def get_command(cls) -> int:
         msg = """
 [1] Send to multiple subaddresses
 [2] Send from multiple subaddresses
 [3] Show transactions
-[4] Show primary addresses
+[4] Show addresses
 [5] Show wallet balances
 [6] Show wallet seeds
 [7] Set log level
@@ -180,7 +239,9 @@ def main():
 
             if command == 1:
                 try:
-                    tx_spammer.send_to_multiple()
+                    accounts_to_use = InputHandler.get_num_accounts_to_use()
+                    subaddresses_to_use = InputHandler.get_num_subaddresses_to_use()
+                    tx_spammer.send_to_multiple(accounts_to_use, subaddresses_to_use)
                 except Exception as e:
                     print(f"[!] Could not send txs: {e}")
                     input("[>] Press Enter to continue: ")
@@ -194,7 +255,7 @@ def main():
                 StringUtils.print_txs(wallets)
                 input("[>] Press Enter to continue: ")
             elif command == 4:
-                StringUtils.print_primary_addresses(wallets)
+                StringUtils.print_subaddresses(wallets)
                 input("[>] Press Enter to continue: ")
             elif command == 5:
                 StringUtils.print_wallet_balances(wallets)

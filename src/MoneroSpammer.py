@@ -33,7 +33,7 @@ class MoneroSpammer:
     def __del__(self) -> None:
         self.dispose()
 
-    def _send_to_multiple(self, wallet: MoneroWallet, num_accounts: int = 1, num_subaddresses_per_account: int = 2, can_split: bool = True, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
+    def _send_to_multiple(self, wallet: MoneroWallet, num_accounts: int = 3, num_subaddresses_per_account: int = 5, can_split: bool = True, send_amount_per_subaddress: Optional[int] = None, subtract_fee_from_destinations: bool = False) -> list[MoneroTxWallet]:
         daemon = self.get_daemon()
 
         self._tracker.wait_for_unlocked_balance(daemon, self.SYNC_PERIOD_MS, wallet, 0)
@@ -264,14 +264,14 @@ class MoneroSpammer:
         
         return txs
 
-    def send_to_multiple(self) -> None:
+    def send_to_multiple(self, num_accounts: int, num_subaddresses_per_account: int) -> None:
         print("[*] Sending to multiple subaddresses...")
         wallets = self.get_wallets()
         total_txs: int = 0
 
         for wallet in wallets:
             try:
-                txs = self._send_to_multiple(wallet)
+                txs = self._send_to_multiple(wallet, num_accounts, num_subaddresses_per_account)
                 total_txs = len(txs)
                 print(f"[*] Spammed {len(txs)} txs from wallet at {wallet.get_path()}")
                 sleep(2)
