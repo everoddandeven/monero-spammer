@@ -1,6 +1,6 @@
 import os
 from time import sleep
-from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils, MoneroOutgoingTransfer
+from monero import MoneroRpcConnection, MoneroWallet, MoneroUtils, MoneroOutgoingTransfer, MoneroIncomingTransfer
 from src import MoneroSpammer, Utils
 
 class StringUtils:
@@ -15,7 +15,21 @@ class StringUtils:
             return
         
         for dest in transfer.destinations:
-            print(f"\t\t[*] From account: {transfer.account_index}, Destination: {dest.address}, Amount: {str(dest.amount)}")
+            assert dest.amount is not None
+            print(f"\t\t[*] Sent {MoneroUtils.atomic_units_to_xmr(dest.amount):.12f} XMR from account: {transfer.account_index}, Destination: {dest.address}")
+
+    @classmethod
+    def print_incoming_transfer(cls, transfer: MoneroIncomingTransfer | None) -> None:
+        if transfer is None:
+            return
+        
+        assert transfer.amount is not None
+        print(f"\t\t[*] Received {MoneroUtils.atomic_units_to_xmr(transfer.amount):.12f} XMR to account {transfer.account_index}, subaddress idx: {transfer.subaddress_index}, address: {transfer.address}")
+
+    @classmethod
+    def print_incoming_transfers(cls, transfers: list[MoneroIncomingTransfer]) -> None:
+        for transfer in transfers:
+            cls.print_incoming_transfer(transfer)
 
     @classmethod
     def print_txs(cls, wallet: MoneroWallet | list[MoneroWallet]) -> None:
@@ -28,7 +42,8 @@ class StringUtils:
             for tx in txs:
                 sent = MoneroUtils.atomic_units_to_xmr(Utils.get_tx_sent_amount(tx))
                 received = MoneroUtils.atomic_units_to_xmr(Utils.get_tx_received_amount(tx))
-                print(f"\t[*] hash {tx.hash}, sent: {sent} XMR, received: {received} XMR, confirmations: {tx.num_confirmations}")
+                print(f"\t[*] hash {tx.hash}, sent: {sent:.12f} XMR, received: {received:.12f} XMR, confirmations: {tx.num_confirmations}")
+                cls.print_incoming_transfers(tx.incoming_transfers)
                 cls.print_outgoing_transfer(tx.outgoing_transfer)
 
     @classmethod
@@ -36,7 +51,7 @@ class StringUtils:
         i: int = 1
         for wallet in wallets:
             balance = wallet.get_balance(0, 0)
-            print(f"[{i}] address {wallet.get_primary_address()}, balance: {MoneroUtils.atomic_units_to_xmr(balance)} XMR")
+            print(f"[{i}] address {wallet.get_primary_address()}, balance: {MoneroUtils.atomic_units_to_xmr(balance):.12f} XMR")
             i += 1
 
     @classmethod
@@ -60,7 +75,7 @@ class StringUtils:
         i: int = 1
         for wallet in wallets:
             balance = wallet.get_balance()
-            print(f"[*] spam_wallet_{i} balance: {str(MoneroUtils.atomic_units_to_xmr(balance))} XMR")
+            print(f"[*] spam_wallet_{i} balance: {MoneroUtils.atomic_units_to_xmr(balance):.12f} XMR")
             i += 1
 
     @classmethod

@@ -139,9 +139,12 @@ class MoneroSpammer:
         txs: list[MoneroTxWallet] = []
 
         try:
-            print("[*] Creating txs...")
+            print(f"[*] Sending {send_amount} from account {config.account_index} to {len(config.destinations)} subaddresses")
             txs = wallet.create_txs(config)
-            print(f"[*] Created {len(txs)}")
+            print(f"[*] Created {len(txs)} tx(s):")
+            for tx in txs:
+                print(f"\t[*] Hash: {tx.hash}, Fee: {tx.fee}")
+
         except MoneroError as e:
             # test error applying subtract_from_fee with split txs
             if (subtract_fee_from_destinations and len(txs) == 0):
