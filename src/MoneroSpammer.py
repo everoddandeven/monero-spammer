@@ -3,9 +3,9 @@ from time import sleep
 from monero import (
     MoneroDaemon, MoneroDaemonRpc, MoneroWallet, MoneroRpcConnection, MoneroTxPriority,
     MoneroAccount, MoneroTxConfig, MoneroDestination, MoneroTxWallet, MoneroError, MoneroUtils,
-    MoneroSubaddress
+    MoneroSubaddress, MoneroOutputQuery, MoneroTxQuery, MoneroOutputWallet
 )
-from .utils import MoneroWalletLoader, MoneroWalletTracker, NotEnoughBalanceException, WaitingForUnlockedFundsException
+from .utils import MoneroWalletLoader, MoneroWalletTracker, NotEnoughBalanceException, WaitingForUnlockedFundsException, InputHandler
 
 
 class MoneroSpammer:
@@ -21,6 +21,21 @@ class MoneroSpammer:
     _tracker: MoneroWalletTracker = MoneroWalletTracker()
     _result: dict[str, list[MoneroTxWallet]] = {}
     _num_wallets: int
+
+    @classmethod
+    def _select_output(cls, outputs: list[MoneroOutputWallet]) -> MoneroOutputWallet:
+        i: int = 1
+
+        for output in outputs:
+            assert output.amount is not None
+
+            print(f"[{i}] Output {MoneroUtils.atomic_units_to_xmr(output.amount):.12f} XMR, Public Key: {output.stealth_public_key}")
+
+            i += 1
+
+        index: int = InputHandler.select_output(i)
+
+        return outputs[index - 1]
 
     def __init__(self, connection: MoneroRpcConnection, num_wallets: int):
         MoneroUtils.set_log_level(0)
@@ -284,6 +299,48 @@ class MoneroSpammer:
                 input(f"[>] Press Enter to continue: ")
 
         print(f"[*] Spammed a total of {total_txs} txs")
+
+    def _sweep_output(self, wallet: MoneroWallet) -> None:
+        tx_query = MoneroTxQuery()
+        tx_query.is_locked = False
+        query = MoneroOutputQuery()
+        query.is_spent = False
+        query.tx_query = tx_query
+
+        spendable_outputs = wallet.get_outputs(query)
+
+        if len(spendable_outputs) == 0:
+            raise Exception("[!] No spendable outputs found")
+        
+        selected_output: MoneroOutputWallet = self._select_output(spendable_outputs)
+
+        assert selected_output.account_index is not None
+        assert selected_output.subaddress_index is not None
+        assert selected_output.key_image is not None
+        assert selected_output.key_image.hex is not None
+
+        address = wallet.create_subaddress(selected_output.account_index)
+        key_image = selected_output.key_image.hex
+        
+        config = MoneroTxConfig()
+        config.address = address.address
+        config.key_image = key_image
+        config.relay = True
+        
+        tx = wallet.sweep_output(config)
+
+        print(f"[*] Sweeped output {selected_output.key_image.hex} to subaddress {config.address}, tx hash: {tx.hash}")
+
+    def sweep_outputs(self) -> None:
+        print("[*] Sweeping outputs from multiple wallets...")
+        wallets = self.get_wallets()
+
+        for wallet in wallets:
+            try:
+                self._sweep_output(wallet)
+            except Exception as e:
+                print(f"[!] Could not sweep output from {wallet.get_path()}: {e}")
+                input(f"[>] Press Enter to continue: ")
 
     def send_from_multiple(self) -> None:
         print("[*] Sending from multiple subaddresses...")
