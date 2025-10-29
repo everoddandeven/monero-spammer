@@ -25,39 +25,39 @@ def main():
                     tx_spammer.send_to_multiple(accounts_to_use, subaddresses_to_use)
                 except Exception as e:
                     print(f"[!] Could not send txs: {e}")
-                    input("[>] Press Enter to continue: ")
+                    InputHandler.wait_for_enter()
             elif command == 2:
                 try:
                     tx_spammer.send_from_multiple()
                 except Exception as e:
                     print(f"[!] Could not send txs: {e}")
-                    input("[>] Press Enter to continue: ")
+                    InputHandler.wait_for_enter()
             elif command == 3:
                 try:
                     tx_spammer.sweep_outputs()
                 except Exception as e:
                     print(f"[!] Could not sweep outputs: {e}")
-                    input("[>] Press Enter to continue: ")
+                    InputHandler.wait_for_enter()
             elif command == 4:
                 StringUtils.print_txs(wallets)
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 5:
                 StringUtils.print_subaddresses(wallets)
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 6:
                 StringUtils.print_wallet_outputs(wallets)
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 7:
                 StringUtils.print_wallet_balances(wallets)
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 8:
                 StringUtils.print_wallet_seeds(wallets)
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 9:
                 level = InputHandler.get_log_level()
                 MoneroUtils.set_log_level(level)
                 print(f"[*] Monero log level set to {level}")
-                input("[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
             elif command == 10:
                 print("[*] Quit")
                 return

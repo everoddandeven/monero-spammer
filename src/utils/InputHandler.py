@@ -39,6 +39,10 @@ class InputHandler:
         return connection
     
     @classmethod
+    def wait_for_enter(cls) -> None:
+        input("Press Enter to continue: ")
+
+    @classmethod
     def get_log_level(cls) -> int:
         while True:
             num_str = input("[>] Insert an integer between 0 and 4: ")

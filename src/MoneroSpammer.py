@@ -296,9 +296,10 @@ class MoneroSpammer:
                 wallet.save()
             except Exception as e:
                 print(f"[!] Could not send txs from {wallet.get_path()}: {e}")
-                input(f"[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
 
         print(f"[*] Spammed a total of {total_txs} txs")
+        InputHandler.wait_for_enter()
 
     def _sweep_output(self, wallet: MoneroWallet) -> None:
         tx_query = MoneroTxQuery()
@@ -330,6 +331,8 @@ class MoneroSpammer:
         tx = wallet.sweep_output(config)
 
         print(f"[*] Sweeped output {selected_output.key_image.hex} to subaddress {config.address}, tx hash: {tx.hash}")
+        wallet.save()
+        InputHandler.wait_for_enter()
 
     def sweep_outputs(self) -> None:
         print("[*] Sweeping outputs from multiple wallets...")
@@ -340,7 +343,7 @@ class MoneroSpammer:
                 self._sweep_output(wallet)
             except Exception as e:
                 print(f"[!] Could not sweep output from {wallet.get_path()}: {e}")
-                input(f"[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
 
     def send_from_multiple(self) -> None:
         print("[*] Sending from multiple subaddresses...")
@@ -356,9 +359,10 @@ class MoneroSpammer:
                 wallet.save()
             except Exception as e:
                 print(f"[!] Could not send txs from {wallet.get_path()}: {e}")
-                input(f"[>] Press Enter to continue: ")
+                InputHandler.wait_for_enter()
 
         print(f"[*] Spammed a total of {total_txs} txs")
+        InputHandler.wait_for_enter()
     
     def get_result(self) -> dict[str, list[MoneroTxWallet]]:
         return self._result
