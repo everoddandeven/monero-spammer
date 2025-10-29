@@ -33,7 +33,7 @@ class MoneroSpammer:
 
             i += 1
 
-        index: int = InputHandler.select_output(i)
+        index: int = InputHandler.select_output(i - 1)
 
         return outputs[index - 1]
 
