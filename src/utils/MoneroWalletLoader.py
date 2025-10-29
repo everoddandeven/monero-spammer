@@ -5,6 +5,8 @@ from monero import (
     MoneroNetworkType, MoneroRpcConnection
 )
 
+from .SyncProgressHandler import SyncProgressHandler
+
 
 class MoneroWalletLoader(ABC):
 
@@ -59,7 +61,8 @@ class MoneroWalletLoader(ABC):
         if not wallet.is_connected_to_daemon():
             raise Exception(f"Wallet could not connect to daemon at {connection.uri}")
 
-        wallet.sync()
+        listener = SyncProgressHandler(wallet.get_path())
+        wallet.sync(listener)
         wallet.start_syncing()
         wallet.set_subaddress_label(0, 0, wallet_name)
         wallet.save()

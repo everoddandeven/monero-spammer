@@ -5,6 +5,7 @@ from .MoneroWalletLoader import MoneroWalletLoader
 from .MoneroWalletTracker import MoneroWalletTracker
 from .NotEnoughBalanceException import NotEnoughBalanceException
 from .WaitingForUnlockedFundsException import WaitingForUnlockedFundsException
+from .SyncProgressHandler import SyncProgressHandler
 
 __all__ = [
     'Utils',
@@ -13,5 +14,6 @@ __all__ = [
     'MoneroWalletLoader',
     'MoneroWalletTracker',
     'NotEnoughBalanceException',
-    'WaitingForUnlockedFundsException'
+    'WaitingForUnlockedFundsException',
+    'SyncProgressHandler'
 ]
